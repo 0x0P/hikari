@@ -1,0 +1,125 @@
+// datasource와 generator 설정
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "generated/prisma"
+}
+
+// 컬럼 유형 정의
+enum ColumnKind {
+  text
+  number
+  bool
+  date
+  select
+  multi_select
+  relation
+  rollup
+  json
+}
+
+// 워크스페이스 모델: 테넌트 격리용
+model Workspace {
+  id        String     @id @default(uuid())
+  name      String
+  createdAt DateTime   @default(now())
+
+  tables    TableDef[]
+  columns   ColumnDef[]
+  rows      RowItem[]
+  edges     RelationEdge[]
+  rollups   RollupValue[]
+}
+
+// 사용자 정의 테이블 메타
+model TableDef {
+  id           String     @id @default(uuid())
+  workspaceId  String
+  name         String
+  createdAt    DateTime   @default(now())
+
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  columns      ColumnDef[]
+  rows         RowItem[]
+
+  // relation 컬럼이 역참조하는 용도
+  relatedByColumns ColumnDef[] @relation("RelatedTable")
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+// 컬럼 메타
+model ColumnDef {
+  id              String     @id @default(uuid())
+  tableId         String
+  workspaceId     String
+  name            String
+  kind            ColumnKind
+  settings        Json       @default("{}")
+  relatedTableId  String?
+  position        Int
+
+  table           TableDef   @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  workspace       Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  relatedTable    TableDef?  @relation("RelatedTable", fields: [relatedTableId], references: [id])
+  edges           RelationEdge[] @relation("EdgesByColumn")
+
+  @@unique([tableId, name])
+  @@index([tableId])
+  @@index([workspaceId])
+}
+
+// 실제 행 데이터
+model RowItem {
+  id          String    @id @default(uuid())
+  tableId     String
+  workspaceId String
+  data        Json
+  version     Int       @default(1)
+  createdBy   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now())
+
+  table       TableDef   @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  outgoingEdges RelationEdge[] @relation("SrcRow")
+
+  @@index([tableId])
+  @@index([workspaceId])
+}
+
+model RelationEdge {
+  columnId     String
+  srcRowId     String
+  dstTableId   String
+  dstRowId     String
+  workspaceId  String
+
+  column     ColumnDef @relation("EdgesByColumn", fields: [columnId], references: [id], onDelete: Cascade)
+  srcRow     RowItem   @relation("SrcRow",        fields: [srcRowId], references: [id], onDelete: Cascade)
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@id([columnId, srcRowId, dstRowId])
+  @@index([srcRowId])
+  @@index([dstRowId])
+  @@index([workspaceId])
+}
+
+model RollupValue {
+  tableId     String
+  columnId    String
+  rowId       String
+  workspaceId String
+  value       Json
+
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@id([columnId, rowId])
+  @@index([tableId])
+  @@index([workspaceId])
+}
