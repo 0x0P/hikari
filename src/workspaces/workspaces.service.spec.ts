@@ -11,6 +11,8 @@ describe('WorkspacesService', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
       findMany: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     },
   };
 
@@ -130,6 +132,88 @@ describe('WorkspacesService', () => {
       const result = await service.getWorkspacesList();
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('updateWorkspace', () => {
+    it('ID로 워크스페이스를 업데이트해야 합니다', async () => {
+      const workspaceId = 'test-id';
+      const updateDto = { name: 'Updated Workspace' };
+      const existingWorkspace = {
+        id: workspaceId,
+        name: 'Old Workspace',
+        createdAt: new Date(),
+      };
+      const updatedWorkspace = {
+        id: workspaceId,
+        name: updateDto.name,
+        createdAt: existingWorkspace.createdAt,
+      };
+
+      mockPrismaService.workspace.findUnique.mockResolvedValue(
+        existingWorkspace,
+      );
+      mockPrismaService.workspace.update.mockResolvedValue(updatedWorkspace);
+
+      const result = await service.updateWorkspace(workspaceId, updateDto);
+
+      expect(result).toMatchObject({
+        id: workspaceId,
+        name: updateDto.name,
+      });
+      expect(mockPrismaService.workspace.update).toHaveBeenCalledWith({
+        where: { id: workspaceId },
+        data: updateDto,
+      });
+    });
+
+    it('존재하지 않는 워크스페이스는 NotFoundException을 던져야 합니다', async () => {
+      const workspaceId = 'non-existent-id';
+      const updateDto = { name: 'Updated Workspace' };
+
+      // Prisma update가 P2025 에러를 던지도록 모킹
+      const prismaError: any = new Error('Record not found');
+      prismaError.code = 'P2025';
+      mockPrismaService.workspace.update.mockRejectedValue(prismaError);
+
+      await expect(
+        service.updateWorkspace(workspaceId, updateDto),
+      ).rejects.toThrow(
+        'ID가 "non-existent-id"인 워크스페이스를 찾을 수 없습니다',
+      );
+    });
+  });
+
+  describe('deleteWorkspace', () => {
+    it('ID로 워크스페이스를 삭제해야 합니다', async () => {
+      const workspaceId = 'test-id';
+      const mockWorkspace = {
+        id: workspaceId,
+        name: 'Test Workspace',
+        createdAt: new Date(),
+      };
+
+      mockPrismaService.workspace.delete.mockResolvedValue(mockWorkspace);
+
+      await service.deleteWorkspace(workspaceId);
+
+      expect(mockPrismaService.workspace.delete).toHaveBeenCalledWith({
+        where: { id: workspaceId },
+      });
+      expect(mockPrismaService.workspace.delete).toHaveBeenCalledTimes(1);
+    });
+
+    it('존재하지 않는 워크스페이스는 NotFoundException을 던져야 합니다', async () => {
+      const workspaceId = 'non-existent-id';
+
+      // Prisma delete가 P2025 에러를 던지도록 모킹
+      const prismaError: any = new Error('Record not found');
+      prismaError.code = 'P2025';
+      mockPrismaService.workspace.delete.mockRejectedValue(prismaError);
+
+      await expect(service.deleteWorkspace(workspaceId)).rejects.toThrow(
+        'ID가 "non-existent-id"인 워크스페이스를 찾을 수 없습니다',
+      );
     });
   });
 });

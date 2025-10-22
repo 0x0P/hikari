@@ -11,6 +11,8 @@ describe('WorkspacesController', () => {
     createWorkspace: jest.fn(),
     getWorkspace: jest.fn(),
     getWorkspacesList: jest.fn(),
+    updateWorkspace: jest.fn(),
+    deleteWorkspace: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -97,6 +99,45 @@ describe('WorkspacesController', () => {
 
       expect(result).toEqual(mockResponse);
       expect(mockWorkspacesService.getWorkspacesList).toHaveBeenCalled();
+    });
+  });
+
+  describe('updateWorkspace', () => {
+    it('ID로 워크스페이스를 업데이트해야 합니다', async () => {
+      const workspaceId = 'test-id';
+      const updateDto = { name: 'Updated Workspace' };
+      const mockResponse = new WorkspaceResponseDto({
+        id: workspaceId,
+        name: updateDto.name,
+        createdAt: new Date(),
+      });
+
+      mockWorkspacesService.updateWorkspace.mockResolvedValue(mockResponse);
+
+      const result = await controller.updateWorkspace(workspaceId, updateDto);
+
+      expect(result).toEqual(mockResponse);
+      expect(mockWorkspacesService.updateWorkspace).toHaveBeenCalledWith(
+        workspaceId,
+        updateDto,
+      );
+      expect(mockWorkspacesService.updateWorkspace).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('deleteWorkspace', () => {
+    it('ID로 워크스페이스를 삭제해야 합니다', async () => {
+      const workspaceId = 'test-id';
+
+      mockWorkspacesService.deleteWorkspace.mockResolvedValue(undefined);
+
+      const result = await controller.deleteWorkspace(workspaceId);
+
+      expect(result).toBeUndefined();
+      expect(mockWorkspacesService.deleteWorkspace).toHaveBeenCalledWith(
+        workspaceId,
+      );
+      expect(mockWorkspacesService.deleteWorkspace).toHaveBeenCalledTimes(1);
     });
   });
 });
