@@ -1,9 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  HealthIndicator,
-  HealthIndicatorResult,
-  HealthCheckError,
-} from '@nestjs/terminus';
+import { HealthIndicatorResult } from '@nestjs/terminus';
 import { PrismaService } from '../../prisma/prisma.service';
 
 /**
@@ -15,10 +11,8 @@ import { PrismaService } from '../../prisma/prisma.service';
  * - timeout을 설정하여 DB 응답 지연 시 빠른 실패 처리
  */
 @Injectable()
-export class PrismaHealthIndicator extends HealthIndicator {
-  constructor(private readonly prismaService: PrismaService) {
-    super();
-  }
+export class PrismaHealthIndicator {
+  constructor(private readonly prismaService: PrismaService) {}
 
   /**
    * 데이터베이스 연결 상태를 확인합니다.
@@ -26,24 +20,38 @@ export class PrismaHealthIndicator extends HealthIndicator {
    * @param key - 헬스체크 결과에서 사용할 식별자 키
    * @param timeout - DB 쿼리 타임아웃 (밀리초, 기본값: 3000ms)
    * @returns HealthIndicatorResult - 연결 성공 시 { [key]: { status: 'up' } }
-   * @throws HealthCheckError - 연결 실패 시 예외 발생
+   * @throws Error - 연결 실패 시 예외 발생
    */
   async isHealthy(key: string, timeout = 3000): Promise<HealthIndicatorResult> {
     try {
       // Promise.race로 타임아웃 구현
-      await Promise.race([
-        this.prismaService.$queryRaw`SELECT 1`,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Database timeout')), timeout),
-        ),
-      ]);
+      // setTimeout의 타이머 ID를 저장하여 정리 가능하도록 함
+      let timeoutId: NodeJS.Timeout | undefined;
 
-      return this.getStatus(key, true);
-    } catch (error) {
-      const status = this.getStatus(key, false, {
-        message: error instanceof Error ? error.message : 'Unknown error',
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error('Database timeout')),
+          timeout,
+        );
       });
-      throw new HealthCheckError('Prisma check failed', status);
+
+      try {
+        await Promise.race([
+          this.prismaService.$queryRaw`SELECT 1`,
+          timeoutPromise,
+        ]);
+      } finally {
+        // 쿼리 완료 후 타이머 정리 (메모리 누수 및 open handle 방지)
+        if (timeoutId !== undefined) {
+          clearTimeout(timeoutId);
+        }
+      }
+
+      return { [key]: { status: 'up' } };
+    } catch (error) {
+      throw new Error(
+        `Prisma check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 }
