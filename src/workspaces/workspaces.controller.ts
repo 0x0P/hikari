@@ -1,6 +1,18 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { WorkspacesService } from './workspaces.service';
-import { CreateWorkspaceDto, WorkspaceResponseDto } from './dto';
+import {
+  CreateWorkspaceDto,
+  UpdateWorkspaceDto,
+  WorkspaceResponseDto,
+} from './dto';
 
 @Controller('workspaces')
 export class WorkspacesController {
@@ -21,5 +33,18 @@ export class WorkspacesController {
   @Get(':id')
   async getWorkspace(@Param('id') id: string): Promise<WorkspaceResponseDto> {
     return this.workspacesService.getWorkspace(id);
+  }
+
+  @Patch(':id')
+  async updateWorkspace(
+    @Param('id') id: string,
+    @Body() updateWorkspaceDto: UpdateWorkspaceDto,
+  ): Promise<WorkspaceResponseDto> {
+    return this.workspacesService.updateWorkspace(id, updateWorkspaceDto);
+  }
+
+  @Delete(':id')
+  async deleteWorkspace(@Param('id') id: string): Promise<void> {
+    return this.workspacesService.deleteWorkspace(id);
   }
 }
