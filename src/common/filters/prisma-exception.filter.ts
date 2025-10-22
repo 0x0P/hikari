@@ -7,19 +7,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Response } from 'express';
+import { PrismaErrorCode } from '../constants/prisma-errors';
 
 /**
  * Prisma 예외를 HTTP 응답으로 변환하는 글로벌 예외 필터
- *
- * @description
- * Prisma에서 발생하는 다양한 데이터베이스 에러를 사용자 친화적인 HTTP 응답으로 변환합니다.
- *
- * 주요 처리 에러:
- * - P2002: Unique constraint 위반 (409 Conflict)
- * - P2025: 레코드를 찾을 수 없음 (404 Not Found)
- * - P2003: Foreign key constraint 실패 (400 Bad Request)
- * - P1001: 데이터베이스 서버에 연결할 수 없음 (503 Service Unavailable)
- * - P1008: 작업 타임아웃 (504 Gateway Timeout)
  */
 @Catch(Prisma.PrismaClientKnownRequestError)
 export class PrismaExceptionFilter implements ExceptionFilter {
@@ -37,8 +28,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
 
     // 에러 코드별 처리
     switch (exception.code) {
-      case 'P2002': {
-        // Unique constraint violation
+      case PrismaErrorCode.UNIQUE_CONSTRAINT: {
         const target = (exception.meta?.target as string[]) || [];
         const field = target.join(', ');
         response.status(HttpStatus.CONFLICT).json({
@@ -49,8 +39,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         break;
       }
 
-      case 'P2025': {
-        // Record not found
+      case PrismaErrorCode.NOT_FOUND: {
         response.status(HttpStatus.NOT_FOUND).json({
           statusCode: HttpStatus.NOT_FOUND,
           error: 'Not Found',
@@ -59,8 +48,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         break;
       }
 
-      case 'P2003': {
-        // Foreign key constraint failed
+      case PrismaErrorCode.FOREIGN_KEY_CONSTRAINT: {
         response.status(HttpStatus.BAD_REQUEST).json({
           statusCode: HttpStatus.BAD_REQUEST,
           error: 'Bad Request',
